@@ -1,7 +1,16 @@
 import axios from "axios";
 
+const getApiUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl) {
+    return `${apiUrl}/api`;
+  }
+  // For local dev or when served from same origin
+  return "/api";
+};
+
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: getApiUrl(),
 });
 
 api.interceptors.request.use((config) => {
