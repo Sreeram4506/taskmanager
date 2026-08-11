@@ -13,7 +13,7 @@ dotenv.config();
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const publicPath = path.resolve(__dirname, "../../public");
+const publicPath = path.resolve(__dirname, "../public");
 
 app.use(cors({ origin: process.env.CLIENT_URL || "*", credentials: true }));
 app.use(express.json());
