@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: taskmanager
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start --prefix server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        fromDatabase:
+          name: taskmanager
+          property: connectionString
