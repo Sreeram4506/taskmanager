@@ -13,13 +13,15 @@ dotenv.config();
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const publicPath = path.resolve(__dirname, "../../public");
 
 app.use(cors({ origin: process.env.CLIENT_URL || "*", credentials: true }));
 app.use(express.json());
 app.use(morgan("dev"));
 
 // Serve static files from built React app
-app.use(express.static(path.join(__dirname, "../../public")));
+app.use(express.static(publicPath));
+console.log(`Serving static files from: ${publicPath}`);
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 app.use("/api/auth", authRoutes);
@@ -28,7 +30,9 @@ app.use("/api/users", userRoutes);
 
 // Serve React app for all other routes (client-side routing)
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../../public/index.html"));
+  const indexPath = path.join(publicPath, "index.html");
+  console.log(`Attempting to serve: ${indexPath}`);
+  res.sendFile(indexPath);
 });
 
 app.use((err, req, res, next) => {
