@@ -18,7 +18,7 @@ const router = Router();
 router.use(protect);
 
 router.get("/", getTasks);
-router.post("/", createTask);
+router.post("/", upload.array("documents", 5), createTask);
 router.get("/:id", getTask);
 router.patch("/:id", updateTask);
 router.patch("/:id/status", updateTaskStatus);

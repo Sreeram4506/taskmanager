@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Loader2 } from "lucide-react";
+import { File, Loader2, Paperclip, X } from "lucide-react";
 import Modal from "./Modal";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+import { formatBytes } from "../lib/utils";
+
+const MAX_FILES = 5;
 
 export default function CreateTaskModal({ users, onClose, onCreated }) {
   const { user } = useAuth();
+  const fileInputRef = useRef(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -15,7 +19,26 @@ export default function CreateTaskModal({ users, onClose, onCreated }) {
     dueDate: "",
     assignedTo: "",
   });
+  const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  function handleFilesPicked(e) {
+    const picked = Array.from(e.target.files || []);
+    if (!picked.length) return;
+    setFiles((prev) => {
+      const combined = [...prev, ...picked];
+      if (combined.length > MAX_FILES) {
+        toast.error(`You can attach up to ${MAX_FILES} files`);
+        return combined.slice(0, MAX_FILES);
+      }
+      return combined;
+    });
+    e.target.value = "";
+  }
+
+  function removeFile(index) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -25,7 +48,13 @@ export default function CreateTaskModal({ users, onClose, onCreated }) {
     }
     setLoading(true);
     try {
-      const { data } = await api.post("/tasks", form);
+      const fd = new FormData();
+      Object.entries(form).forEach(([key, value]) => fd.append(key, value));
+      files.forEach((file) => fd.append("documents", file));
+
+      const { data } = await api.post("/tasks", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       toast.success("Task created");
       onCreated(data.task);
     } catch (err) {
@@ -110,6 +139,64 @@ export default function CreateTaskModal({ users, onClose, onCreated }) {
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+              <Paperclip size={14} /> Documents
+            </label>
+            {files.length < MAX_FILES && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 px-2 py-1 rounded-lg hover:bg-indigo-50 transition"
+              >
+                Add files
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={handleFilesPicked}
+            />
+          </div>
+
+          {files.length > 0 ? (
+            <ul className="space-y-2">
+              {files.map((file, i) => (
+                <li
+                  key={`${file.name}-${i}`}
+                  className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2"
+                >
+                  <div className="w-7 h-7 rounded-md bg-white border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                    <File size={13} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-800 truncate">{file.name}</p>
+                    <p className="text-xs text-slate-400">{formatBytes(file.size)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(i)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition"
+                  >
+                    <X size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-4 text-sm text-slate-400 text-center border border-dashed border-slate-200 rounded-lg hover:border-indigo-300 hover:text-indigo-500 transition"
+            >
+              Push documents to this task (optional)
+            </button>
+          )}
         </div>
 
         <button

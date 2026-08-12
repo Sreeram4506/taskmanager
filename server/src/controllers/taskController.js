@@ -46,6 +46,14 @@ export async function createTask(req, res) {
       return res.status(400).json({ message: "Title and assignee are required" });
     }
 
+    const documents = (req.files || []).map((file) => ({
+      originalName: file.originalname,
+      storedName: file.filename,
+      mimeType: file.mimetype,
+      size: file.size,
+      uploadedBy: req.user._id,
+    }));
+
     const task = await Task.create({
       title,
       description,
@@ -53,6 +61,7 @@ export async function createTask(req, res) {
       dueDate: dueDate || undefined,
       assignedTo,
       assignedBy: req.user._id,
+      documents,
     });
     const populated = await task.populate(POPULATE);
     res.status(201).json({ task: populated });

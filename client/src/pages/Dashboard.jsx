@@ -196,6 +196,7 @@ export default function Dashboard() {
       {activeTask && (
         <TaskDetailModal
           task={activeTask}
+          users={users}
           onClose={() => setActiveTask(null)}
           onUpdated={upsertTask}
           onDeleted={removeTask}

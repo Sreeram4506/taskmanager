@@ -10,9 +10,11 @@ import {
   Loader2,
   Lock,
   Paperclip,
+  Pencil,
   Trash2,
   Upload,
   UserCircle2,
+  X,
 } from "lucide-react";
 import Modal from "./Modal";
 import Avatar from "./Avatar";
@@ -27,12 +29,20 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "Completed", icon: CheckCircle2 },
 ];
 
-export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted }) {
+function toDateInput(value) {
+  if (!value) return "";
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+export default function TaskDetailModal({ task, users = [], onClose, onUpdated, onDeleted }) {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editForm, setEditForm] = useState(null);
 
   const assigneeId = task.assignedTo?._id || task.assignedTo?.id;
   const ownerId = task.assignedBy?._id || task.assignedBy?.id;
@@ -42,6 +52,33 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
   const canChangeStatus = isAssignee || isAdmin;
   const canUpload = isAssignee || isOwner || isAdmin;
   const canDeleteTask = isOwner || isAdmin;
+  const canEditTask = isOwner || isAdmin;
+
+  function startEditing() {
+    setEditForm({
+      title: task.title,
+      description: task.description || "",
+      priority: task.priority,
+      dueDate: toDateInput(task.dueDate),
+      assignedTo: assigneeId,
+    });
+    setIsEditing(true);
+  }
+
+  async function handleSaveEdit(e) {
+    e.preventDefault();
+    setSavingEdit(true);
+    try {
+      const { data } = await api.patch(`/tasks/${task._id}`, editForm);
+      onUpdated(data.task);
+      toast.success("Task updated");
+      setIsEditing(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update task");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   async function changeStatus(status) {
     if (status === task.status) return;
@@ -128,34 +165,142 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
         >
           {task.priority} priority
         </span>
-        {canDeleteTask && (
-          <button
-            onClick={handleDeleteTask}
-            disabled={deleting}
-            className="text-slate-400 hover:text-rose-600 transition p-1.5 rounded-lg hover:bg-rose-50"
-            title="Delete task"
-          >
-            {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {canEditTask && !isEditing && (
+            <button
+              onClick={startEditing}
+              className="text-slate-400 hover:text-indigo-600 transition p-1.5 rounded-lg hover:bg-indigo-50"
+              title="Edit task"
+            >
+              <Pencil size={16} />
+            </button>
+          )}
+          {canDeleteTask && !isEditing && (
+            <button
+              onClick={handleDeleteTask}
+              disabled={deleting}
+              className="text-slate-400 hover:text-rose-600 transition p-1.5 rounded-lg hover:bg-rose-50"
+              title="Delete task"
+            >
+              {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            </button>
+          )}
+        </div>
       </div>
 
-      <h2 className="text-xl font-bold text-slate-900 mb-2">{task.title}</h2>
-      {task.description && (
-        <p className="text-slate-600 text-sm mb-5 whitespace-pre-wrap">{task.description}</p>
+      {isEditing ? (
+        <form onSubmit={handleSaveEdit} className="space-y-4 mb-6">
+          <div>
+            <label className="text-sm font-medium text-slate-700 mb-1.5 block">Title</label>
+            <input
+              required
+              autoFocus
+              value={editForm.title}
+              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+              Description
+            </label>
+            <textarea
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              rows={3}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition text-sm resize-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                Priority
+              </label>
+              <select
+                value={editForm.priority}
+                onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition text-sm bg-white"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                Due date
+              </label>
+              <input
+                type="date"
+                value={editForm.dueDate}
+                onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+              Assign to
+            </label>
+            <select
+              required
+              value={editForm.assignedTo}
+              onChange={(e) => setEditForm({ ...editForm, assignedTo: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition text-sm bg-white"
+            >
+              {users.map((u) => (
+                <option key={u._id} value={u._id}>
+                  {u.name} {u._id === user.id ? "(you)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={savingEdit}
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-medium py-2.5 rounded-lg transition flex items-center justify-center gap-2 shadow-sm shadow-indigo-600/30"
+            >
+              {savingEdit && <Loader2 size={16} className="animate-spin" />}
+              Save changes
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              disabled={savingEdit}
+              className="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition flex items-center gap-1.5"
+            >
+              <X size={15} />
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">{task.title}</h2>
+          {task.description && (
+            <p className="text-slate-600 text-sm mb-5 whitespace-pre-wrap">{task.description}</p>
+          )}
+
+          <div className="grid grid-cols-2 gap-4 mb-5">
+            <PersonBlock label="Assigned to" personObj={task.assignedTo} />
+            <PersonBlock label="Assigned by" personObj={task.assignedBy} />
+          </div>
+
+          {task.dueDate && (
+            <p className="text-sm text-slate-500 mb-5 flex items-center gap-1.5">
+              <Clock size={14} /> Due {format(new Date(task.dueDate), "MMMM d, yyyy")}
+            </p>
+          )}
+        </>
       )}
 
-      <div className="grid grid-cols-2 gap-4 mb-5">
-        <PersonBlock label="Assigned to" personObj={task.assignedTo} />
-        <PersonBlock label="Assigned by" personObj={task.assignedBy} />
-      </div>
-
-      {task.dueDate && (
-        <p className="text-sm text-slate-500 mb-5 flex items-center gap-1.5">
-          <Clock size={14} /> Due {format(new Date(task.dueDate), "MMMM d, yyyy")}
-        </p>
-      )}
-
+      {!isEditing && (
+      <>
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <label className="text-sm font-medium text-slate-700">Status</label>
@@ -265,6 +410,8 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
           </p>
         )}
       </div>
+      </>
+      )}
     </Modal>
   );
 }
